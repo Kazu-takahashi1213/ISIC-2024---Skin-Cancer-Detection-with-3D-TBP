@@ -63,4 +63,4 @@ StratifiedGroupKFold（5分割）を用いて、患者単位でグルーピン�
 
 ・最終モデルは全データで再学習し、テストデータに対して predict_proba() により予測確率を出力
 
-・submission.csv にフォーマットしてKaggle提出可能
+・submission.csv にフォーマットしてKaggle提出

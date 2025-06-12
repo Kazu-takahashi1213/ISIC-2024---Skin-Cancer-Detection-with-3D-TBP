@@ -1,66 +1,104 @@
 ![Joseph KZ - ISIC 2024 - Skin Cancer Detection with 3D-TBP](https://github.com/user-attachments/assets/aca05b7d-5998-4e4f-9236-e0301f97afd1)
 
-ISIC2024で使用したモデルの概要とその流れ
+<br>
 
-～概要～
+Overview：
+This project presents a high-performance structured data classification pipeline developed for the ISIC 2024 Skin Cancer Classification Challenge, aiming to predict malignant vs. benign skin lesions.
+<br>
+Key techniques include:
 
-ISIC 2024 Skin Cancer Classification Challengeにおいて、皮膚がん病変の悪性／良性判定を高精度で実現するための構造化データベース分類パイプラインを構築。3Dテクスチャベースパターン（TBP）特徴やImageNet由来の外部予測スコアを活用し、LightGBM・CatBoost・XGBoostをアンサンブルしたVotingClassifierによりモデル性能を最大化した。さらに、患者単位での層別交差検証、外部特徴への微小ノイズ注入（いわゆる“Magic Noise”）といった工夫を取り入れ、汎化性能とロバスト性を両立する構成を目指した。最終的にROC AUCを主要評価指標とし、再現性と信頼性を確保した分類モデルを完成させた。
+3D Texture-Based Pattern (TBP) features
 
+External prediction scores from ImageNet-based models
 
-～当モデルの目的・流れ～
+Ensemble model using LightGBM, XGBoost, and CatBoost with soft voting
 
-〇 目的
+Patient-level cross-validation with Stratified Group K-Fold
 
-皮膚病変画像と構造化情報をもとに、「悪性か良性か」を予測する2値分類モデルを構築。ISIC 2024 Challengeの評価基準（主にAUC）において高スコアを目指す。
+Noise injection ("Magic Noise") to enhance generalization
 
-〇 データ概要
+<br>
+By combining these techniques, we developed a robust, reproducible, and generalizable model optimized for ROC AUC, the primary evaluation metric of the competition.
+<br>
 
-構造化メタデータ（CSV）： 患者ID、年齢、病変サイズ、病変タイプなど
+〇 Objective
+To build a binary classification model that predicts whether a skin lesion is malignant or benign, using structured metadata and image-derived features.
+The goal is to maximize performance on the ISIC 2024 leaderboard, primarily judged by ROC AUC.
+<br>
 
-TBP特徴量（3Dテクスチャパターン）： LAB色空間における明度差・色差・面積・形状などを定量化した指標群
+〇 dataset Overview
+Structured metadata (CSV):
+Patient ID, age, lesion size/type, etc.
 
-外部予測スコア（imagenet_predict）： ImageNet事前学習モデルによる0–1の予測スコア
+<br>
+TBP features (3D Texture-Based Patterns):
+Quantified indicators of color differences (ΔL, ΔB), contrast with surrounding skin, lesion area, shape (eccentricity), etc., extracted in the LAB color space.
 
-〇 手順
+<br>
+External prediction scores (imagenet_predict):
+Soft probabilities (0–1) from a pretrained ImageNet model for each sample.
 
-① 特徴量エンジニアリング
+<br>
+〇 Pipeline Details
+1. Feature Engineering
+Selected 20+ numerical features from metadata and TBP
 
-・20種類以上の数値型特徴量（num_cols）を選定
+Included ΔL/ΔB, lesion contrast, area, eccentricity
 
-・TBP由来の色差（ΔL, ΔB）・周辺皮膚とのコントラスト、面積、eccentricityなどを活用
+Missing values filled (mean imputation or zero-fill)
 
-・欠損値補完（主に平均補完や0埋め）
+Added Gaussian noise to ImageNet scores (e.g., ±0.0000003) to prevent overfitting (Magic Noise)
 
-・ImageNet予測値に微小なガウスノイズを加えて過学習を抑制
+<br>
+2. Model Construction (Ensemble)
+Used VotingClassifier to ensemble:
 
+LightGBM (weight: 0.5)
 
-②　モデル構築：アンサンブル
+XGBoost (weight: 0.45)
 
-LightGBM, XGBoost, CAtboostの3モデルをVotingClassifierで統合（ソフト投票）
+CatBoost (weight: 0.1)
 
-・各重みは0.5, 0.45, 0.1に設定
+Soft voting strategy to balance strengths of each model
 
+<br>
+3. Cross-Validation & Sampling
+Applied StratifiedGroupKFold (n=5) grouped by patient_id to prevent data leakage
 
-③ 交差検証とサンプリング
+Handled class imbalance via:
 
-StratifiedGroupKFold（5分割）を用いて、患者単位でグルーピングして情報リークを防止
+Over-sampling (e.g., SMOTE)
 
-・不均衡データ対策として、オーバーサンプリング（SMOTEなど）やアンダーサンプリングを併用
+Under-sampling
 
+<br>
+4. Magic Noise Injection
+Injected small Gaussian noise into external features (ImageNet scores) to:
 
-④ Magic Noise（ノイズ注入）
+Increase model diversity
 
-外部特徴（ImageNet予測スコア）に対して、極小のガウスノイズ（例：0.0000003）を加える
+Enhance generalization
 
-・モデルの出力多様性を上げ、過学習の抑制と汎化性能の向上
+Reduce overfitting
 
+<br>
+5. Evaluation & Final Prediction
+Primary metric: ROC AUC
 
-⑤ 評価指標と最終予測
+Averaged AUC across folds for validation
 
-評価指標は ROC AUC
+Final model retrained on full dataset
 
-・各FoldのAUCを平均してモデル性能を評価
+Predictions made using predict_proba() and exported to submission.csv
 
-・最終モデルは全データで再学習し、テストデータに対して predict_proba() により予測確率を出力
+<br>
+〇 Technical Highlights
+Fusion of structured metadata and image-derived features
 
-・submission.csv にフォーマットしてKaggle提出
+Balanced ensemble of three gradient boosting models
+
+Noise-based regularization strategy (Magic Noise)
+
+Robust validation via group-based stratification
+
+<br>

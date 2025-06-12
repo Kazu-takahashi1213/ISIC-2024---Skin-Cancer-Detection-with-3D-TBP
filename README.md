@@ -2,99 +2,141 @@
 
 <br>
 
+A high-performance, ensemble-based classification pipeline that predicts whether a skin lesion is malignant or benign—leveraging structured data, texture features, and external model scores.
+<br>
+
+Designed for the ISIC 2024 Challenge, this model achieved a silver medal by combining tabular data modeling techniques with carefully engineered features and robust validation strategies.
+
+<br>
 Overview
-This project presents a high-performance structured data classification pipeline developed for the ISIC 2024 Skin Cancer Classification Challenge, aiming to predict malignant vs. benign skin lesions.
+This project focuses on structured data classification for skin cancer diagnosis, using non-image features such as patient metadata, engineered texture descriptors, and scores from external models.
 <br>
-Key techniques include:
+Key techniques:
 
-3D Texture-Based Pattern (TBP) features
+Ensemble of LightGBM, XGBoost, and CatBoost
 
-External prediction scores from ImageNet-based models
+Integration of TBP (Texture-Based Pattern) features
 
-Ensemble model using LightGBM, XGBoost, and CatBoost with soft voting
+External scores from ImageNet models
 
-Patient-level cross-validation with Stratified Group K-Fold
+VotingClassifier with weighted soft voting
 
-Noise injection ("Magic Noise") to enhance generalization
+StratifiedGroupKFold validation (by patient)
 
-<br>
-By combining these techniques, we developed a robust, reproducible, and generalizable model optimized for ROC AUC, the primary evaluation metric of the competition.
-<br>
-
-Objective
-To build a binary classification model that predicts whether a skin lesion is malignant or benign, using structured metadata and image-derived features.
-The goal is to maximize performance on the ISIC 2024 leaderboard, primarily judged by ROC AUC.
-<br>
-
-Dataset Overview
-Structured metadata (CSV):
-Patient ID, age, lesion size/type, etc.
+"Magic Noise" injection for generalization
 
 <br>
-TBP features (3D Texture-Based Patterns):
-Quantified indicators of color differences (ΔL, ΔB), contrast with surrounding skin, lesion area, shape (eccentricity), etc., extracted in the LAB color space.
+Task Objective
+To build a binary classifier that predicts whether a skin lesion is malignant or benign, using structured tabular features derived from patient data and image-based descriptors.
+<br>
+The model is optimized for ROC AUC, the main metric used in the ISIC 2024 competition.
+<br>
+
+Feature Inputs
+The final model uses a mix of metadata, engineered texture features, and external prediction scores:
+<br>
+
+Feature Type	Description
+Metadata (CSV)	Patient ID, age, lesion size, lesion type, etc.
+TBP Features	LAB color-space descriptors (ΔL, ΔB), area, eccentricity, skin contrast
+ImageNet Scores	Pretrained CNN output probabilities (float values between 0–1)
 
 <br>
-External prediction scores (imagenet_predict):
-Soft probabilities (0–1) from a pretrained ImageNet model for each sample.
+Preprocessing & Feature Engineering
+Selected 20+ numeric features (e.g., ΔL, ΔB, lesion size, area, shape)
+
+Handled missing values using mean imputation or zero-fill
+
+Injected small Gaussian noise into ImageNet-based features
+
+Example: ±0.0000003
+
+Purpose: promote output diversity and suppress overfitting
 
 <br>
-Pipeline Details
-1. Feature Engineering
-Selected 20+ numerical features from metadata and TBP
+Model Architecture
+Ensemble Model
+The core classifier is a VotingClassifier that combines three gradient boosting models:
+<br>
 
-Included ΔL/ΔB, lesion contrast, area, eccentricity
+Model	Weight
+LightGBM	0.50
+XGBoost	0.45
+CatBoost	0.10
 
-Missing values handled using mean imputation or zero-fill
+<br> Soft voting is used to aggregate probability outputs across models. <br>
+Training & Validation
+Cross-Validation Strategy
+Used StratifiedGroupKFold (n=5) to ensure:
 
-Injected Gaussian noise into ImageNet scores (e.g., ±0.0000003) to reduce overfitting (Magic Noise)
+Balanced malignant/benign distribution in each fold
+
+Patient-level grouping to prevent data leakage
 
 <br>
-2. Model Construction (Ensemble)
-Built a VotingClassifier ensemble using:
+Imbalance Handling
+Applied a combination of:
 
-LightGBM (weight: 0.5)
+SMOTE (over-sampling)
 
-XGBoost (weight: 0.45)
-
-CatBoost (weight: 0.1)
-
-Used soft voting to leverage the strengths of each model
+Under-sampling strategies for minority/majority class balance
 
 <br>
-3. Cross-Validation and Sampling
-Employed StratifiedGroupKFold (n=5) with patient ID grouping to avoid data leakage
+Magic Noise Injection
+To further improve model generalization, we applied Magic Noise:
+<br>
 
-Applied a combination of over-sampling (e.g., SMOTE) and under-sampling for class balance
+Added minimal Gaussian noise to external features (e.g., ImageNet scores)
+
+Encourages robustness by promoting minor feature variations during training
 
 <br>
-4. Noise Injection (Magic Noise)
-Injected small Gaussian noise into external features (ImageNet scores) to:
+This small trick helped reduce overfitting and improve performance on unseen data.
+<br>
 
-Increase model diversity
+Evaluation Metrics
+The model is evaluated using ROC AUC as the primary metric.
+<br>
 
-Improve generalization
+Calculated AUC on each fold
 
-Suppress overfitting
+Final validation score is the mean AUC across folds
+
+Final model retrained on all data before submission
+
+Output: prediction probabilities (predict_proba) for test set
 
 <br>
-5. Evaluation and Final Prediction
-Evaluation metric: ROC AUC
+Submission Format
+Final predictions were saved as submission.csv
 
-Averaged AUC across folds during validation
+Includes:
 
-Retrained final model on the full dataset
+patient_id
 
-Generated predictions using predict_proba() and formatted output as submission.csv
+prediction_score (malignancy probability)
 
 <br>
-Technical Highlights
-Integration of structured metadata with image-derived features
+Key Takeaways
+Structured + texture + external scores = powerful fusion
 
-Balanced ensemble of three gradient boosting frameworks
+Ensemble voting (with well-tuned weights) improved performance
 
-Use of noise-based regularization to improve robustness
+Patient-level validation is crucial in medical settings
 
+Tiny noise (Magic Noise) can make a measurable difference
+
+<br>
+Future Improvements
+Add image features from CNNs directly (early/late fusion)
+
+Explore multimodal training (tabular + image)
+
+Test more sophisticated stacking/blending techniques
+
+Integrate explainability (e.g., SHAP values) for medical interpretability
+
+<br>
 Reliable group-aware validation strategy to ensure reproducibility
 
 <br>

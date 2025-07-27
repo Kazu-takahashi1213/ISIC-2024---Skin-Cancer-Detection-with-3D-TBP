@@ -1,136 +1,44 @@
 ![Joseph KZ - ISIC 2024 - Skin Cancer Detection with 3D-TBP](https://github.com/user-attachments/assets/aca05b7d-5998-4e4f-9236-e0301f97afd1)
 
-# ISIC 2024 - Skin Lesion Classification with Structured Data & Ensemble Learning  
-A high-performance, ensemble-based classification pipeline that predicts whether a skin lesion is malignant or benign—leveraging structured data, texture features, and external model scores.  
-<br>  
-> Designed for the ISIC 2024 Challenge, this model achieved a **silver medal** by combining tabular data modeling techniques with carefully engineered features and robust validation strategies.  
-<br>
+# ISIC 2024
 
----
+このプロジェクトは、皮膚がんかどうかをAIで予測することを目的に作られた診断支援モデルです。特徴的なのは、画像そのものではなく、画像や患者データから「数値」に変換された情報（構造化データ）を使っている点です。
 
-## Overview  
-This project focuses on structured data classification for skin cancer diagnosis, using **non-image features** such as patient metadata, engineered texture descriptors, and scores from external models.  
-<br>  
-Key techniques:  
-- Ensemble of **LightGBM**, **XGBoost**, and **CatBoost**  
-- Integration of **TBP (Texture-Based Pattern) features**  
-- External scores from **ImageNet models**  
-- **VotingClassifier** with weighted soft voting  
-- **StratifiedGroupKFold** validation (by patient)  
-- **"Magic Noise"** injection for generalization  
-<br>
+使われる主な情報は次の3つです：
 
----
+① 患者の基本情報：年齢や病変のサイズ、種類など
 
-## Task Objective  
-To build a binary classifier that predicts whether a skin lesion is **malignant** or **benign**, using structured tabular features derived from patient data and image-based descriptors.  
-<br>  
-The model is optimized for **ROC AUC**, the main metric used in the ISIC 2024 competition.  
-<br>
+② 画像から取り出した特徴（色や形）：がんの特徴に多い色合いやいびつな形など
 
----
+③ 他の画像AIの診断スコア：すでに学習済みの画像モデルの「がんらしさ」スコア
 
-## Feature Inputs  
-The final model uses a mix of metadata, engineered texture features, and external prediction scores:  
-<br>
+これらの情報を使い、「この病変はがんである確率は〇〇%」という形で出力します。
 
-| Feature Type        | Description |
-|---------------------|-------------|
-| **Metadata (CSV)**  | Patient ID, age, lesion size, lesion type, etc. |
-| **TBP Features**    | LAB color-space descriptors (ΔL, ΔB), area, eccentricity, skin contrast |
-| **ImageNet Scores** | Pretrained CNN output probabilities (float values between 0–1) |  
-<br>
+モデルは3つのAIを“チームプレイ”で使って判断
+このAIモデルの中心は、「アンサンブル学習」という方法です。
+これは、1つのAIだけで判断せず、複数のAI（今回は3つ）を組み合わせて最終判断をする手法です。
 
----
+具体的には次の3つのAIを使っています：
 
-## Preprocessing & Feature Engineering  
-- Selected 20+ numeric features (e.g., ΔL, ΔB, lesion size, area, shape)  
-- Handled missing values using mean imputation or zero-fill  
-- Injected **small Gaussian noise** into ImageNet-based features  
-  - Example: ±0.0000003  
-  - Purpose: promote output diversity and suppress overfitting  
-<br>
+LightGBM（速くて精度が高い）
 
----
+XGBoost（非常に安定していて信頼性が高い）
 
-## Model Architecture  
+CatBoost（性別などのカテゴリ情報に強い）
 
-### Ensemble Model  
-The core classifier is a **VotingClassifier** that combines three gradient boosting models:  
-<br>
+この3つのAIがそれぞれ「がんである確率」を出し、その**平均（重み付き）**をとって最終的な予測を行います。これにより、1つのAIに頼るよりも安定して高精度な判断ができるのです。
 
-| Model     | Weight |
-|-----------|--------|
-| LightGBM  | 0.50   |
-| XGBoost   | 0.45   |
-| CatBoost  | 0.10   |  
-<br>  
-Soft voting is used to aggregate probability outputs across models.  
-<br>
+微小な「ノイズ」でより強く・賢く
+さらに、予測に使う特徴量の一部（他のAIモデルのスコア）に、あえてごくわずかな“ゆらぎ（ノイズ）を加えるという工夫も取り入れています。
+これを「マジックノイズ」と呼び、モデルが些細な違いにもしっかり対応できるようになり、本番での予測精度が向上しました。
 
----
+つまりこのプロジェクトでは、
 
-## Training & Validation  
+画像をそのまま見るのではなく、画像から意味のある数字（特徴）を取り出して使う
 
-### Cross-Validation Strategy  
-- Used **StratifiedGroupKFold (n=5)** to ensure:  
-  - Balanced malignant/benign distribution in each fold  
-  - Patient-level grouping to prevent data leakage  
-<br>
+複数のAIを組み合わせて、より賢く・安定して判断する
 
-### Imbalance Handling  
-- Applied a combination of:  
-  - **SMOTE (over-sampling)**  
-  - **Under-sampling** strategies for minority/majority class balance  
-<br>
+少しだけ“ノイズ”を入れて、過学習を防ぎ、未知の患者にも強くする
 
----
+という3つの工夫によって、「高精度な皮膚がん予測」を実現しました。
 
-## Magic Noise Injection  
-To further improve model generalization, we applied **Magic Noise**:  
-<br>  
-- Added minimal Gaussian noise to external features (e.g., ImageNet scores)  
-- Encourages robustness by promoting minor feature variations during training  
-<br>  
-This small trick helped reduce overfitting and improve performance on unseen data.  
-<br>
-
----
-
-## Evaluation Metrics  
-The model is evaluated using **ROC AUC** as the primary metric.  
-<br>  
-- Calculated AUC on each fold  
-- Final validation score is the **mean AUC across folds**  
-- Final model retrained on all data before submission  
-- Output: prediction probabilities (`predict_proba`) for test set  
-<br>
-
----
-
-## Submission Format  
-- Final predictions were saved as `submission.csv`  
-- Includes:  
-  - `patient_id`  
-  - `prediction_score` (malignancy probability)  
-<br>
-
----
-
-## Key Takeaways  
-- Structured + texture + external scores = powerful fusion  
-- Ensemble voting (with well-tuned weights) improved performance  
-- Patient-level validation is **crucial** in medical settings  
-- Tiny noise (Magic Noise) can make a measurable difference  
-<br>
-
----
-
-## Future Improvements  
-- Add image features from CNNs directly (early/late fusion)  
-- Explore multimodal training (tabular + image)  
-- Test more sophisticated stacking/blending techniques  
-- Integrate explainability (e.g., SHAP values) for medical interpretability  
-<br>
-
----
